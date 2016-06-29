@@ -43,7 +43,7 @@ PFS_global_param pfs_param;
 PFS_table_stat PFS_table_stat::g_reset_template;
 
 C_MODE_START
-static void destroy_pfs_thread(void *key);
+static void STDCALL destroy_pfs_thread(void *key);
 C_MODE_END
 
 static void cleanup_performance_schema(void);
@@ -139,7 +139,7 @@ initialize_performance_schema(PFS_global_param *param)
   return &PFS_bootstrap;
 }
 
-static void destroy_pfs_thread(void *key)
+static void STDCALL destroy_pfs_thread(void *key)
 {
   PFS_thread* pfs= reinterpret_cast<PFS_thread*> (key);
   DBUG_ASSERT(pfs);
