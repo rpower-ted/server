@@ -1845,14 +1845,8 @@ pthread_handler_t start_wsrep_THD(void *arg)
   }
 
   mysql_mutex_lock(&LOCK_thread_count);
-  wsrep_running_threads++;
+  if ((++ wsrep_running_threads) > 1) wsrep_creating_startup_threads= 0;
   mysql_cond_broadcast(&COND_thread_count);
-
-  if (wsrep_running_threads > 2)
-  {
-    wsrep_creating_startup_threads= 0;
-  }
-
   mysql_mutex_unlock(&LOCK_thread_count);
 
   processor(thd);

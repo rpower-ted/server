@@ -3111,7 +3111,12 @@ void plugin_thdvar_init(THD *thd)
   thd->variables.dynamic_variables_size= 0;
   thd->variables.dynamic_variables_ptr= 0;
 
-  if (IF_WSREP((!WSREP(thd) || !thd->wsrep_applier),1))
+  /*
+    wsrep system threads are created before LOCK_plugin is initialized.
+    This will be invoked again for them after the plugins and related
+    global system variables are fully initialized.
+  */
+  if (IF_WSREP((wsrep_creating_startup_threads == 0),1))
   {
     mysql_mutex_lock(&LOCK_plugin);
     thd->variables.table_plugin=

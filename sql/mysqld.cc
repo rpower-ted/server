@@ -5203,49 +5203,6 @@ static int init_server_components()
   }
   plugins_are_initialized= TRUE;  /* Don't separate from init function */
 
-#ifdef WITH_WSREP
-  /* Wait for wsrep threads to get created. */
-  if (wsrep_creating_startup_threads == 1) {
-    mysql_mutex_lock(&LOCK_thread_count);
-    while (wsrep_running_threads < 2)
-    {
-      mysql_cond_wait(&COND_thread_count, &LOCK_thread_count);
-    }
-
-    /* Now is the time to initialize threads for queries. */
-    THD *tmp;
-    I_List_iterator<THD> it(threads);
-    while ((tmp= it++))
-    {
-      if (tmp->wsrep_applier == true)
-      {
-        /*
-          Save/restore server_status and variables.option_bits and they get
-          altered during init_for_queries().
-        */
-        unsigned int server_status_saved= tmp->server_status;
-        ulonglong option_bits_saved= tmp->variables.option_bits;
-
-        /*
-          Set THR_THD to temporarily point to this THD to register all the
-          variables that allocates memory for this THD.
-        */
-        THD *current_thd_saved= current_thd;
-        set_current_thd(tmp);
-
-        tmp->init_for_queries();
-
-        /* Restore current_thd. */
-        set_current_thd(current_thd_saved);
-
-        tmp->server_status= server_status_saved;
-        tmp->variables.option_bits= option_bits_saved;
-      }
-    }
-    mysql_mutex_unlock(&LOCK_thread_count);
-  }
-#endif
-
   /* we do want to exit if there are any other unknown options */
   if (remaining_argc > 1)
   {
@@ -5344,6 +5301,55 @@ static int init_server_components()
 
   if (init_default_storage_engine(enforced_storage_engine, enforced_table_plugin))
     unireg_abort(1);
+
+#ifdef WITH_WSREP
+  if (WSREP_ON)
+  {
+    mysql_mutex_lock(&LOCK_thread_count);
+    /* Wait for wsrep threads to get created. */
+    if (wsrep_creating_startup_threads == 1) {
+      while (wsrep_running_threads < 2)
+      {
+        mysql_cond_wait(&COND_thread_count, &LOCK_thread_count);
+      }
+      DBUG_ASSERT(wsrep_creating_startup_threads == 0);
+    }
+
+    /* Now is the time to finalize the initialization of wsrep threads. */
+    THD *tmp;
+    I_List_iterator<THD> it(threads);
+    while ((tmp= it++))
+    {
+      if (tmp->wsrep_applier == true)
+      {
+        /*
+          Save server_status and variables.option_bits as they get altered
+          during init_for_queries(). (see wsrep_replication_process())
+        */
+        unsigned int server_status_saved= tmp->server_status;
+        ulonglong option_bits_saved= tmp->variables.option_bits;
+
+        /*
+          Set THR_THD to temporarily point to this THD to register all the
+          variables that allocate memory for this THD.
+        */
+        THD *current_thd_saved= current_thd;
+        set_current_thd(tmp);
+        tmp->init_for_queries();
+        /* Restore current_thd. */
+        set_current_thd(current_thd_saved);
+
+        /* Post initialization for wsrep startup threads. */
+        plugin_thdvar_init(tmp);
+
+        /* Restore saved variables. */
+        tmp->server_status= server_status_saved;
+        tmp->variables.option_bits= option_bits_saved;
+      }
+    }
+    mysql_mutex_unlock(&LOCK_thread_count);
+  }
+#endif
 
 #ifdef USE_ARIA_FOR_TMP_TABLES
   if (!ha_storage_engine_is_enabled(maria_hton) && !opt_bootstrap)
