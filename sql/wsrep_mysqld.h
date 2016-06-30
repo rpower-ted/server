@@ -86,6 +86,7 @@ extern my_bool     wsrep_slave_FK_checks;
 extern my_bool     wsrep_slave_UK_checks;
 extern ulong       wsrep_running_threads;
 extern bool        wsrep_new_cluster;
+extern my_bool     wsrep_creating_startup_threads;
 extern bool        wsrep_gtid_mode;
 extern uint32      wsrep_gtid_domain_id;
 
@@ -337,6 +338,7 @@ bool wsrep_create_like_table(THD* thd, TABLE_LIST* table,
 #define wsrep_thr_init() do {} while(0)
 #define wsrep_thr_deinit() do {} while(0)
 #define wsrep_running_threads (0)
+#define wsrep_creating_startup_threads (0)
 
 #endif /* WITH_WSREP */
 #endif /* WSREP_MYSQLD_H */
