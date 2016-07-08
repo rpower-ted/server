@@ -705,7 +705,7 @@ bool LEX::setup_select_in_parentheses()
   @param no_lookahead  True if the parser has no lookahead
 */
 
-static void sp_create_assignment_lex(THD *thd, bool no_lookahead)
+void sp_create_assignment_lex(THD *thd, bool no_lookahead)
 {
   LEX *lex= thd->lex;
 
@@ -743,7 +743,7 @@ static void sp_create_assignment_lex(THD *thd, bool no_lookahead)
   @return false if success, true otherwise.
 */
 
-static bool sp_create_assignment_instr(THD *thd, bool no_lookahead)
+bool sp_create_assignment_instr(THD *thd, bool no_lookahead)
 {
   LEX *lex= thd->lex;
 
