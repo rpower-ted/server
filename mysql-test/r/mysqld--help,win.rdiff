@@ -1,5 +1,5 @@
---- mysqld--help.result
-+++ mysqld--help,win.reject
+--- mysqld--help.result	2016-07-13 16:56:30.707809300 +0000
++++ mysqld--help,win.reject	2016-07-22 13:01:26.742494300 +0000
 @@ -321,7 +321,6 @@
   The number of segments in a key cache
   -L, --language=name Client error messages in given language. May be given as
@@ -45,35 +45,19 @@
   --stored-program-cache=# 
   The soft upper limit for number of cached stored routines
   for one connection.
-@@ -1070,25 +1078,11 @@
-  --thread-cache-size=# 
-  How many threads we should keep in a cache for reuse.
-  These are freed after 5 minutes of idle time
-- --thread-pool-idle-timeout=# 
-- Timeout in seconds for an idle thread in the thread
-- pool.Worker thread will be shut down after timeout
+@@ -1076,6 +1084,11 @@
   --thread-pool-max-threads=# 
   Maximum allowed number of worker threads in the thread
   pool
-- --thread-pool-oversubscribe=# 
-- How many additional active worker threads in a group are
-- allowed.
-- --thread-pool-size=# 
-- Number of thread groups in the pool. This parameter is
-- roughly equivalent to maximum number of concurrently
-- executing threads (threads in a waiting state do not
-- count as executing).
-- --thread-pool-stall-limit=# 
-- Maximum query execution time in milliseconds,before an
-- executing non-yielding thread is considered stalled.If a
-- worker thread is stalled, additional worker thread may be
-- created to handle remaining clients.
 + --thread-pool-min-threads=# 
 + Minimum number of threads in the thread pool.
-  --thread-stack=#    The stack size for each thread
-  --time-format=name  The TIME format (ignored)
-  --timed-mutexes     Specify whether to time mutexes. Deprecated, has no
-@@ -1097,8 +1091,8 @@
++ --thread-pool-mode=name 
++ Chose implementation of the threadpool. One of: windows, 
++ generic
+  --thread-pool-oversubscribe=# 
+  How many additional active worker threads in a group are
+  allowed.
+@@ -1097,8 +1110,8 @@
   size, MySQL will automatically convert it to an on-disk
   MyISAM or Aria table
   -t, --tmpdir=name   Path for temporary files. Several paths may be specified,
@@ -84,7 +68,7 @@
   --transaction-alloc-block-size=# 
   Allocation block size for transactions to be stored in
   binary log
-@@ -1225,7 +1219,6 @@
+@@ -1223,7 +1236,6 @@
  key-cache-division-limit 100
  key-cache-file-hash-size 512
  key-cache-segments 0
@@ -92,7 +76,7 @@
  lc-messages en_US
  lc-messages-dir MYSQL_SHAREDIR/
  lc-time-names en_US
-@@ -1291,6 +1284,7 @@
+@@ -1289,6 +1301,7 @@
  myisam-stats-method NULLS_UNEQUAL
  myisam-use-mmap FALSE
  mysql56-temporal-format TRUE
@@ -100,7 +84,7 @@
  net-buffer-length 16384
  net-read-timeout 30
  net-retry-count 10
-@@ -1387,6 +1381,8 @@
+@@ -1385,6 +1398,8 @@
  secure-auth TRUE
  secure-file-priv (No default value)
  server-id 0
@@ -109,7 +93,7 @@
  show-slave-auth-info FALSE
  silent-startup FALSE
  skip-grant-tables TRUE
-@@ -1411,6 +1407,7 @@
+@@ -1409,6 +1424,7 @@
  slave-type-conversions 
  slow-launch-time 2
  slow-query-log FALSE
@@ -117,7 +101,7 @@
  sort-buffer-size 2097152
  sql-mode NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
  stack-trace TRUE
-@@ -1423,15 +1420,13 @@
+@@ -1421,13 +1437,15 @@
  sync-relay-log 10000
  sync-relay-log-info 10000
  sysdate-is-now FALSE
@@ -128,11 +112,10 @@
 +table-open-cache 2000
  tc-heuristic-recover OFF
  thread-cache-size 151
--thread-pool-idle-timeout 60
+ thread-pool-idle-timeout 60
  thread-pool-max-threads 1000
--thread-pool-oversubscribe 3
--thread-pool-stall-limit 500
 +thread-pool-min-threads 1
++thread-pool-mode windows
+ thread-pool-oversubscribe 3
+ thread-pool-stall-limit 500
  thread-stack 297984
- time-format %H:%i:%s
- timed-mutexes FALSE

@@ -34,13 +34,23 @@ uint threadpool_max_size;
 uint threadpool_stall_limit;
 uint threadpool_max_threads;
 uint threadpool_oversubscribe;
+uint threadpool_mode;
 
 /* Stats */
 TP_STATISTICS tp_stats;
 
 
+static void  threadpool_remove_connection(THD *thd);
+static int   threadpool_process_request(THD *thd);
+static THD*  threadpool_add_connection(CONNECT *connect, void *scheduler_data);
+
 extern "C" pthread_key(struct st_my_thread_var*, THR_KEY_mysys);
 extern bool do_command(THD*);
+
+static inline TP_connection *get_TP_connection(THD *thd)
+{
+  return (TP_connection *)thd->event_scheduler.data;
+}
 
 /*
   Worker threads contexts, and THD contexts.
@@ -106,7 +116,52 @@ static void thread_attach(THD* thd)
 }
 
 
-THD* threadpool_add_connection(CONNECT *connect, void *scheduler_data)
+void tp_callback(TP_connection *c)
+{
+  DBUG_ASSERT(c);
+  
+  THD *thd= c->thd;
+
+  c->state = TP_STATE_RUNNING;
+
+  if (!thd)
+  {
+    /* No THD, need to login first. */
+    DBUG_ASSERT(c->connect);
+    thd= c->thd= threadpool_add_connection(c->connect, c);
+    if (!thd)
+    {
+      /* Bail out on connect error.*/
+      goto error;
+    }
+    c->connect= 0;
+  }
+  else if (threadpool_process_request(thd))
+  {
+    /* QUIT or an error occured. */
+    goto error;
+  }
+
+  /* Read next command from client. */
+  c->set_io_timeout(thd->variables.net_wait_timeout);
+  c->state= TP_STATE_IDLE;
+  if (c->start_io())
+    goto error;
+
+  return;
+
+error:
+  c->thd= 0;
+  delete c;
+
+  if (thd)
+  {
+    threadpool_remove_connection(thd);
+  }
+}
+
+
+static THD* threadpool_add_connection(CONNECT *connect, void *scheduler_data)
 {
   THD *thd= NULL;
   int error=1;
@@ -190,12 +245,12 @@ THD* threadpool_add_connection(CONNECT *connect, void *scheduler_data)
 }
 
 
-void threadpool_remove_connection(THD *thd)
+static void threadpool_remove_connection(THD *thd)
 {
   Worker_thread_context worker_context;
   worker_context.save();
   thread_attach(thd);
-
+  thd->event_scheduler.data= 0;
   thd->net.reading_or_writing = 0;
   end_connection(thd);
   close_connection(thd, 0);
@@ -214,7 +269,7 @@ void threadpool_remove_connection(THD *thd)
 /**
  Process a single client request or a single batch.
 */
-int threadpool_process_request(THD *thd)
+static int threadpool_process_request(THD *thd)
 {
   int retval= 0;
   Worker_thread_context  worker_context;
@@ -286,6 +341,111 @@ static bool tp_end_thread(THD *, bool)
 {
   return 0;
 }
+
+static TP_pool *pool;
+
+static bool tp_init()
+{
+
+#ifdef _WIN32
+  if (threadpool_mode == TP_MODE_WINDOWS)
+    pool= new (std::nothrow) TP_pool_win;
+  else
+    pool= new (std::nothrow) TP_pool_unix;
+#else
+  pool= new (std::nothrow) TP_pool_unix;
+#endif
+  if (!pool)
+    return true;
+  if (pool->init())
+  {
+    delete pool;
+    pool= 0;
+    return true;
+  }
+  return false;
+}
+
+static void tp_add_connection(CONNECT *connect)
+{
+  TP_connection *c= pool->new_connection(connect);
+  DBUG_EXECUTE_IF("simulate_failed_connection_1", delete c ; c= 0;);
+  if (c)
+    pool->add(c);
+  else
+    connect->close_and_delete();
+}
+
+int tp_get_idle_thread_count()
+{
+  return pool? pool->get_idle_thread_count(): 0;
+}
+
+int tp_get_thread_count()
+{
+  return pool ? pool->get_thread_count() : 0;
+}
+
+void tp_set_min_threads(uint val)
+{
+  if (pool)
+    pool->set_min_threads(val);
+}
+
+
+void tp_set_max_threads(uint val)
+{
+  if (pool)
+    pool->set_max_threads(val);
+}
+
+void tp_set_threadpool_size(uint val)
+{
+  if (pool)
+    pool->set_pool_size(val);
+}
+
+
+void tp_set_threadpool_stall_limit(uint val)
+{
+  if (pool)
+    pool->set_stall_limit(val);
+}
+
+
+void tp_timeout_handler(TP_connection *c)
+{
+  if (c->state != TP_STATE_IDLE)
+    return;
+  THD *thd=c->thd;
+  mysql_mutex_lock(&thd->LOCK_thd_data);
+  thd->killed = KILL_CONNECTION;
+  post_kill_notification(thd);
+  mysql_mutex_unlock(&thd->LOCK_thd_data);
+}
+
+
+static void tp_wait_begin(THD *thd, int type)
+{
+  TP_connection *c = get_TP_connection(thd);
+  if (c)
+    c->wait_begin(type);
+}
+
+
+static void tp_wait_end(THD *thd)
+{
+  TP_connection *c = get_TP_connection(thd);
+  if (c)
+    c->wait_end();
+}
+
+
+static void tp_end()
+{
+  delete pool;
+}
+
 
 static scheduler_functions tp_scheduler_functions=
 {
