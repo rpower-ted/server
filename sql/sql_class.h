@@ -687,7 +687,7 @@ typedef struct system_variables
   double long_query_time_double, max_statement_time_double;
 
   my_bool pseudo_slave_mode;
-
+  ulong threadpool_priority;
 } SV;
 
 /**

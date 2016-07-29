@@ -23,7 +23,7 @@ extern uint threadpool_max_size;
 extern uint threadpool_stall_limit;  /* time interval in 10 ms units for stall checks*/
 extern uint threadpool_max_threads;  /* Maximum threads in pool */
 extern uint threadpool_oversubscribe;  /* Maximum active threads in group */
-
+extern uint threadpool_prio_kickup_timer;  /* Time before low prio item gets prio boost */
 #ifdef _WIN32
 extern uint threadpool_mode; /* Thread pool implementation , windows or generic */
 #define TP_MODE_WINDOWS 0
@@ -63,11 +63,10 @@ extern void tp_scheduler(void);
 extern int show_threadpool_idle_threads(THD *thd, SHOW_VAR *var, char *buff,
                                         enum enum_var_type scope);
 
-
 enum  TP_PRIORITY {
   TP_PRIORITY_HIGH,
   TP_PRIORITY_LOW,
-  TP_PRIORITY_NONE
+  TP_PRIORITY_AUTO
 };
 
 
@@ -91,12 +90,13 @@ struct TP_connection
   CONNECT*    connect;
   TP_STATE    state;
   TP_PRIORITY priority;
-
+  bool        in_transaction;
   TP_connection(CONNECT *c) :
     thd(0),
     connect(c),
     state(TP_STATE_IDLE),
-    priority(TP_PRIORITY_NONE)
+    priority(TP_PRIORITY_HIGH),
+    in_transaction(false)
   {}
 
   virtual ~TP_connection()

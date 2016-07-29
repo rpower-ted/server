@@ -35,6 +35,7 @@ uint threadpool_stall_limit;
 uint threadpool_max_threads;
 uint threadpool_oversubscribe;
 uint threadpool_mode;
+uint threadpool_prio_kickup_timer;
 
 /* Stats */
 TP_STATISTICS tp_stats;
@@ -115,6 +116,22 @@ static void thread_attach(THD* thd)
 #endif
 }
 
+/*
+  Determine connection priority , using current 
+  transaction state and 'threadpool_priority' variable value.
+*/
+static TP_PRIORITY get_priority(TP_connection *c)
+{
+  TP_PRIORITY prio= (TP_PRIORITY)c->thd->variables.threadpool_priority;
+  if (prio == TP_PRIORITY_AUTO)
+  {
+    bool was_in_transaction= c->in_transaction;
+    c->in_transaction= c->thd->transaction.is_active();
+    return (was_in_transaction && c->in_transaction) ? TP_PRIORITY_HIGH : TP_PRIORITY_LOW;
+  }
+  return prio;
+}
+
 
 void tp_callback(TP_connection *c)
 {
@@ -141,6 +158,9 @@ void tp_callback(TP_connection *c)
     /* QUIT or an error occured. */
     goto error;
   }
+
+  /* Set priority */
+  c->priority= get_priority(c);
 
   /* Read next command from client. */
   c->set_io_timeout(thd->variables.net_wait_timeout);
@@ -419,7 +439,8 @@ void tp_timeout_handler(TP_connection *c)
     return;
   THD *thd=c->thd;
   mysql_mutex_lock(&thd->LOCK_thd_data);
-  thd->killed = KILL_CONNECTION;
+  thd->killed= KILL_CONNECTION;
+  c->priority= TP_PRIORITY_HIGH;
   post_kill_notification(thd);
   mysql_mutex_unlock(&thd->LOCK_thd_data);
 }
@@ -446,6 +467,13 @@ static void tp_end()
   delete pool;
 }
 
+static void tp_post_kill_notification(THD *thd)
+{
+  TP_connection *c= get_TP_connection(thd);
+  if (c)
+    c->priority= TP_PRIORITY_HIGH;
+  post_kill_notification(thd);
+}
 
 static scheduler_functions tp_scheduler_functions=
 {
@@ -457,7 +485,7 @@ static scheduler_functions tp_scheduler_functions=
   tp_add_connection,                  // add_connection
   tp_wait_begin,                      // thd_wait_begin
   tp_wait_end,                        // thd_wait_end
-  post_kill_notification,             // post_kill_notification
+  tp_post_kill_notification,          // post kill notification
   tp_end_thread,                      // Dummy function
   tp_end                              // end
 };
