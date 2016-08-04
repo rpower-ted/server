@@ -1079,6 +1079,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
 %token  CLASS_ORIGIN_SYM              /* SQL-2003-N */
 %token  CLIENT_SYM
 %token  CLOSE_SYM                     /* SQL-2003-R */
+%token  CLOB                          /* SQL-2003-R */
 %token  COALESCE                      /* SQL-2003-N */
 %token  CODE_SYM
 %token  COLLATE_SYM                   /* SQL-2003-R */
@@ -1447,6 +1448,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
 %token  QUICK
 %token  RANGE_SYM                     /* SQL-2003-R */
 %token  RANK_SYM        
+%token  RAW                           /* Oracle */
 %token  READS_SYM                     /* SQL-2003-R */
 %token  READ_ONLY_SYM
 %token  READ_SYM                      /* SQL-2003-N */
@@ -1639,6 +1641,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
 %token  VALUE_SYM                     /* SQL-2003-R */
 %token  VARBINARY
 %token  VARCHAR                       /* SQL-2003-R */
+%token  VARCHAR2                      /* Oracle */
 %token  VARIABLES
 %token  VARIANCE_SYM
 %token  VARYING                       /* SQL-2003-R */
@@ -14462,6 +14465,7 @@ keyword_sp:
         | CIPHER_SYM               {}
         | CLIENT_SYM               {}
         | CLASS_ORIGIN_SYM         {}
+        | CLOB                     {}
         | COALESCE                 {}
         | CODE_SYM                 {}
         | COLLATION_SYM            {}
@@ -14645,6 +14649,7 @@ keyword_sp:
         | QUARTER_SYM              {}
         | QUERY_SYM                {}
         | QUICK                    {}
+        | RAW                      {}
         | READ_ONLY_SYM            {}
         | REBUILD_SYM              {}
         | RECOVER_SYM              {}
@@ -14732,6 +14737,7 @@ keyword_sp:
         | UNTIL_SYM                {}
         | USER                     {}
         | USE_FRM                  {}
+        | VARCHAR2                 {}
         | VARIABLES                {}
         | VIEW_SYM                 {}
         | VIRTUAL_SYM              {}
