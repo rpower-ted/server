@@ -44,7 +44,9 @@ if (!$_slave_timeout)
 if ($_result == -1)
 {
   --let $_current_gtid_pos= `SELECT @@GLOBAL.gtid_slave_pos`
+  --let $_slave_status= `SHOW SLAVE STATUS`
   --echo Timeout in master_gtid_wait('$master_pos', $_slave_timeout), current slave GTID position is: $_current_gtid_pos.
+  --echo Slave state : $_slave_status
   --die Failed to sync with master
 }
 
