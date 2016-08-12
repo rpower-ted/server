@@ -6,7 +6,7 @@
 --source include/rpl_init.inc
 
 --connection server_1
-ALTER TABLE mysql.gtid_slave_pos ENGINE=InnoDB;
+ALTER TABLE mysql.gtid_slave_pos ENGINE=TokuDB;
 CREATE TABLE t1 (a int PRIMARY KEY, b INT, UNIQUE KEY (b)) ENGINE=TokuDB;
 --save_master_pos
 

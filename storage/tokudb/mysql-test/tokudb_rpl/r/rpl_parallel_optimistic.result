@@ -1,6 +1,6 @@
 include/rpl_init.inc [topology=1->2]
-ALTER TABLE mysql.gtid_slave_pos ENGINE=InnoDB;
-CREATE TABLE t1 (a int PRIMARY KEY, b INT) ENGINE=TokuDB;
+ALTER TABLE mysql.gtid_slave_pos ENGINE=TokuDB;
+CREATE TABLE t1 (a int PRIMARY KEY, b INT, UNIQUE KEY (b)) ENGINE=TokuDB;
 SET @old_parallel_threads=@@GLOBAL.slave_parallel_threads;
 include/stop_slave.inc
 SET GLOBAL slave_parallel_threads=10;
@@ -9,21 +9,21 @@ SET @old_parallel_mode=@@GLOBAL.slave_parallel_mode;
 SET GLOBAL slave_parallel_mode='optimistic';
 INSERT INTO t1 VALUES(1,1);
 BEGIN;
-INSERT INTO t1 VALUES(2,1);
-INSERT INTO t1 VALUES(3,1);
+INSERT INTO t1 VALUES(2,2);
+INSERT INTO t1 VALUES(3,3);
 COMMIT;
 DELETE FROM t1 WHERE a=2;
 INSERT INTO t1 VALUES (2,2);
 DELETE FROM t1 WHERE a=2;
-INSERT INTO t1 VALUES (2,3);
+INSERT INTO t1 VALUES (2,6);
 DELETE FROM t1 WHERE a=2;
 INSERT INTO t1 VALUES (2,4);
 DELETE FROM t1 WHERE a=2;
 INSERT INTO t1 VALUES (2,5);
 DELETE FROM t1 WHERE a=3;
-INSERT INTO t1 VALUES(3,2);
+INSERT INTO t1 VALUES(3,3);
 DELETE FROM t1 WHERE a=1;
-INSERT INTO t1 VALUES(1,2);
+INSERT INTO t1 VALUES(1,4);
 DELETE FROM t1 WHERE a=3;
 INSERT INTO t1 VALUES(3,3);
 DELETE FROM t1 WHERE a=2;
@@ -31,20 +31,20 @@ INSERT INTO t1 VALUES (2,6);
 include/save_master_gtid.inc
 SELECT * FROM t1 ORDER BY a;
 a	b
-1	2
+1	4
 2	6
 3	3
 include/start_slave.inc
 include/sync_with_master_gtid.inc
 SELECT * FROM t1 ORDER BY a;
 a	b
-1	2
+1	4
 2	6
 3	3
 *** Test a bunch of non-transactional/DDL event groups. ***
 include/stop_slave.inc
-INSERT INTO t1 VALUES (4,4);
-INSERT INTO t1 VALUES (5,5);
+INSERT INTO t1 VALUES (4,8);
+INSERT INTO t1 VALUES (5,9);
 CREATE TABLE t2 (a INT PRIMARY KEY) ENGINE=TokuDB;
 INSERT INTO t2 VALUES (1);
 CREATE TABLE t3 (a INT PRIMARY KEY) ENGINE=MyISAM;
@@ -73,11 +73,11 @@ INSERT INTO t3 SELECT a+200 FROM t2;
 include/save_master_gtid.inc
 SELECT * FROM t1 ORDER BY a;
 a	b
-1	2
+1	4
 2	6
 3	3
-4	4
-5	5
+4	8
+5	9
 SELECT * FROM t2 ORDER BY a;
 a	c
 1	NULL
@@ -99,11 +99,11 @@ include/start_slave.inc
 include/sync_with_master_gtid.inc
 SELECT * FROM t1 ORDER BY a;
 a	b
-1	2
+1	4
 2	6
 3	3
-4	4
-5	5
+4	8
+5	9
 SELECT * FROM t2 ORDER BY a;
 a	c
 1	NULL
@@ -137,21 +137,21 @@ UPDATE t1 SET b=890 WHERE a=3;
 SET SESSION skip_parallel_replication=0;
 SELECT * FROM t1 ORDER BY a;
 a	b
-1	2
+1	4
 2	6
 3	890
-4	4
-5	5
+4	8
+5	9
 include/save_master_gtid.inc
 include/start_slave.inc
 include/sync_with_master_gtid.inc
 SELECT * FROM t1 ORDER BY a;
 a	b
-1	2
+1	4
 2	6
 3	890
-4	4
-5	5
+4	8
+5	9
 status
 Ok, no retry
 *** Test that we do not replicate in parallel transactions that had row lock waits on the master ***
@@ -193,7 +193,7 @@ a	b
 1	1006
 2	6
 3	1008
-4	4
+4	8
 5	1007
 include/save_master_gtid.inc
 include/start_slave.inc
@@ -203,7 +203,7 @@ a	b
 1	1006
 2	6
 3	1008
-4	4
+4	8
 5	1007
 status
 Ok, no retry
