@@ -147,6 +147,11 @@ static void tokudb_lock_timeout_callback(
     const DBT* right_key,
     uint64_t blocking_txnid);
 
+static void tokudb_lock_wait_needed_callback(
+    void* arg,
+    uint64_t requesting_txnid,
+    uint64_t blocking_txnid);
+
 #define ASSERT_MSGLEN 1024
 
 void toku_hton_assert_fail(
@@ -533,6 +538,7 @@ static int tokudb_init_func(void *p) {
     db_env->change_fsync_log_period(db_env, tokudb::sysvars::fsync_log_period);
 
     db_env->set_lock_timeout_callback(db_env, tokudb_lock_timeout_callback);
+    db_env->set_lock_wait_callback(db_env, tokudb_lock_wait_needed_callback);
 
     db_env->set_loader_memory_size(
         db_env,
@@ -1744,6 +1750,62 @@ static void tokudb_lock_timeout_callback(
             }
 #endif
         }
+    }
+}
+
+extern "C" void thd_report_wait_for(MYSQL_THD thd, MYSQL_THD other_thd);
+
+struct tokudb_search_txn_thd {
+    bool match_found;
+    uint64_t match_txn_id;
+    THD *match_client_thd;
+};
+
+static int tokudb_search_txn_thd_callback(
+    DB_TXN* txn,
+    iterate_row_locks_callback iterate_locks,
+    void* locks_extra,
+    void* extra) {
+
+    uint64_t txn_id = txn->id64(txn);
+    void *client_extra = txn->get_client_extra(txn);
+    struct tokudb_search_txn_thd* e =
+        reinterpret_cast<struct tokudb_search_txn_thd*>(extra);
+    if (e->match_txn_id == txn_id) {
+        e->match_found = true;
+        e->match_client_thd = reinterpret_cast<THD *>(client_extra);
+        return 1;
+    }
+    return 0;
+}
+
+static bool tokudb_txn_id_to_thd(
+    uint64_t txnid,
+    THD **out_thd) {
+
+    struct tokudb_search_txn_thd e = {
+        false,
+        txnid,
+        0
+    };
+    db_env->iterate_live_transactions(db_env, tokudb_search_txn_thd_callback, &e);
+    if (e.match_found) {
+        *out_thd = e.match_client_thd;
+    }
+    return e.match_found;
+}
+
+static void tokudb_lock_wait_needed_callback(
+    void *arg,
+    uint64_t requesting_txnid,
+    uint64_t blocking_txnid) {
+
+    DB* db = static_cast<DB*>(arg);
+    THD *requesting_thd;
+    THD *blocking_thd;
+    if (tokudb_txn_id_to_thd(requesting_txnid, &requesting_thd) &&
+        tokudb_txn_id_to_thd(blocking_txnid, &blocking_thd)) {
+        thd_report_wait_for (requesting_thd, blocking_thd);
     }
 }
 

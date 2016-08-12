@@ -323,12 +323,16 @@ int locked_txn_abort(DB_TXN *txn) {
     return r;
 }
 
-static void locked_txn_set_client_id(DB_TXN *txn, uint64_t client_id) {
-    toku_txn_set_client_id(db_txn_struct_i(txn)->tokutxn, client_id);
+static void locked_txn_set_client_id(DB_TXN *txn, uint64_t client_id, void *extra) {
+    toku_txn_set_client_id(db_txn_struct_i(txn)->tokutxn, client_id, extra);
 }
 
 static uint64_t locked_txn_get_client_id(DB_TXN *txn) {
     return toku_txn_get_client_id(db_txn_struct_i(txn)->tokutxn);
+}
+
+static void *locked_txn_get_client_extra(DB_TXN *txn) {
+    return toku_txn_get_client_extra(db_txn_struct_i(txn)->tokutxn);
 }
 
 static int toku_txn_discard(DB_TXN *txn, uint32_t flags) {
@@ -392,6 +396,7 @@ static inline void txn_func_init(DB_TXN *txn) {
     STXN(txn_stat);
     STXN(set_client_id);
     STXN(get_client_id);
+    STXN(get_client_extra);
 #undef STXN
 #define SUTXN(name) txn->name = toku_txn_ ## name
     SUTXN(prepare);

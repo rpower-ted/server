@@ -142,7 +142,10 @@ void lock_request::build_wait_graph(wfg *wait_graph, const txnid_set &conflicts)
 
 // returns: true if the current set of lock requests contains
 //          a deadlock, false otherwise.
-bool lock_request::deadlock_exists(const txnid_set &conflicts) {
+bool lock_request::deadlock_exists(const txnid_set &conflicts,
+                                   void (*lock_wait_callback)(void *, TXNID, TXNID),
+                                   void *callback_data) {
+
     wfg wait_graph;
     wait_graph.create();
 
@@ -150,11 +153,20 @@ bool lock_request::deadlock_exists(const txnid_set &conflicts) {
     bool deadlock = wait_graph.cycle_exists_from_txnid(m_txnid);
 
     wait_graph.destroy();
+
+    if (lock_wait_callback) {
+        size_t num_conflicts = conflicts.size();
+        for (size_t i = 0; i < num_conflicts; i++) {
+            lock_wait_callback(callback_data, m_txnid, conflicts.get(i));
+        }
+    }
+
     return deadlock;
 }
 
 // try to acquire a lock described by this lock request. 
-int lock_request::start(void) {
+int lock_request::start(void (*lock_wait_callback)(void *, TXNID, TXNID),
+                        void *callback_data) {
     int r;
 
     txnid_set conflicts;
@@ -175,7 +187,7 @@ int lock_request::start(void) {
         m_conflicting_txnid = conflicts.get(0);
         toku_mutex_lock(&m_info->mutex);
         insert_into_lock_requests();
-        if (deadlock_exists(conflicts)) {
+        if (deadlock_exists(conflicts, lock_wait_callback, callback_data)) {
             remove_from_lock_requests();
             r = DB_LOCK_DEADLOCK;
         }

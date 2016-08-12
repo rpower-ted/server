@@ -269,6 +269,7 @@ static txn_child_manager tcm;
         .state = TOKUTXN_LIVE,
         .num_pin = 0,
         .client_id = 0,
+        .client_extra = nullptr,
         .start_time = time(NULL),
     };
 
@@ -709,8 +710,13 @@ uint64_t toku_txn_get_client_id(TOKUTXN txn) {
     return txn->client_id;
 }
 
-void toku_txn_set_client_id(TOKUTXN txn, uint64_t client_id) {
+void *toku_txn_get_client_extra(TOKUTXN txn) {
+    return txn->client_extra;
+}
+
+void toku_txn_set_client_id(TOKUTXN txn, uint64_t client_id, void *extra) {
     txn->client_id = client_id;
+    txn->client_extra = extra;
 }
 
 time_t toku_txn_get_start_time(struct tokutxn *txn) {
