@@ -4981,8 +4981,7 @@ bool LEX::sp_handler_declaration_finalize(THD *thd, int type)
 
 void LEX::sp_block_init(THD *thd, const LEX_STRING label)
 {
-  sp_label *lab= spcont->push_label(thd, label, sphead->instructions());
-  lab->type= sp_label::BEGIN;
+  spcont->push_label(thd, label, sphead->instructions(), sp_label::BEGIN);
   spcont= spcont->push_context(thd, sp_pcontext::REGULAR_SCOPE);
 }
 
@@ -5147,7 +5146,12 @@ bool LEX::sp_leave_statement(THD *thd, const LEX_STRING label_name)
     my_error(ER_SP_LILABEL_MISMATCH, MYF(0), "LEAVE", label_name.str);
     return true;
   }
+  return sp_exit_block(thd, lab);
+}
 
+
+bool LEX::sp_exit_block(THD *thd, sp_label *lab)
+{
   /*
     When jumping to a BEGIN-END block end, the target jump
     points to the block hpop/cpop cleanup instructions,
@@ -5159,6 +5163,31 @@ bool LEX::sp_leave_statement(THD *thd, const LEX_STRING label_name)
   bool exclusive= (lab->type == sp_label::BEGIN);
   return sp_change_context(thd, lab->ctx, exclusive) ||
          sphead->add_instr_jump_forward_with_backpatch(thd, spcont, lab);
+}
+
+
+bool LEX::sp_exit_statement(THD *thd)
+{
+  sp_label *lab= spcont->find_label_current_loop_start();
+  if (!lab)
+  {
+    my_error(ER_SP_LILABEL_MISMATCH, MYF(0), "EXIT", "");
+    return true;
+  }
+  DBUG_ASSERT(lab->type == sp_label::ITERATION);
+  return sp_exit_block(thd, lab);
+}
+
+
+bool LEX::sp_exit_statement(THD *thd, const LEX_STRING label_name)
+{
+  sp_label *lab= spcont->find_label(label_name);
+  if (!lab || lab->type != sp_label::ITERATION)
+  {
+    my_error(ER_SP_LILABEL_MISMATCH, MYF(0), "EXIT", label_name);
+    return true;
+  }
+  return sp_exit_block(thd, lab);
 }
 
 
@@ -5196,8 +5225,8 @@ bool LEX::sp_push_loop_label(THD *thd, const LEX_STRING label_name)
     my_error(ER_SP_LABEL_REDEFINE, MYF(0), label_name.str);
     return true;
   }
-  lab= spcont->push_label(thd, label_name, sphead->instructions());
-  lab->type= sp_label::ITERATION;
+  spcont->push_label(thd, label_name, sphead->instructions(),
+                     sp_label::ITERATION);
   return false;
 }
 
@@ -5207,7 +5236,8 @@ bool LEX::sp_push_loop_empty_label(THD *thd)
   if (maybe_start_compound_statement(thd))
     return true;
   /* Unlabeled controls get an empty label. */
-  spcont->push_label(thd, empty_lex_str, sphead->instructions());
+  spcont->push_label(thd, empty_lex_str, sphead->instructions(),
+                     sp_label::ITERATION);
   return false;
 }
 
