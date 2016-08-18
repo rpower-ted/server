@@ -79,7 +79,7 @@ void lock_request::destroy(void) {
 }
 
 // set the lock request parameters. this API allows a lock request to be reused.
-void lock_request::set(locktree *lt, TXNID txnid, const DBT *left_key, const DBT *right_key, lock_request::type lock_type, bool big_txn) {
+void lock_request::set(locktree *lt, TXNID txnid, const DBT *left_key, const DBT *right_key, lock_request::type lock_type, bool big_txn, void *extra) {
     invariant(m_state != state::PENDING);
     m_lt = lt;
     m_txnid = txnid;
@@ -91,6 +91,7 @@ void lock_request::set(locktree *lt, TXNID txnid, const DBT *left_key, const DBT
     m_state = state::INITIALIZED;
     m_info = lt ? lt->get_lock_request_info() : nullptr;
     m_big_txn = big_txn;
+    m_extra = extra;
 }
 
 // get rid of any stored left and right key copies and
@@ -142,10 +143,7 @@ void lock_request::build_wait_graph(wfg *wait_graph, const txnid_set &conflicts)
 
 // returns: true if the current set of lock requests contains
 //          a deadlock, false otherwise.
-bool lock_request::deadlock_exists(const txnid_set &conflicts,
-                                   void (*lock_wait_callback)(void *, TXNID, TXNID),
-                                   void *callback_data) {
-
+bool lock_request::deadlock_exists(const txnid_set &conflicts) {
     wfg wait_graph;
     wait_graph.create();
 
@@ -153,13 +151,6 @@ bool lock_request::deadlock_exists(const txnid_set &conflicts,
     bool deadlock = wait_graph.cycle_exists_from_txnid(m_txnid);
 
     wait_graph.destroy();
-
-    if (lock_wait_callback) {
-        size_t num_conflicts = conflicts.size();
-        for (size_t i = 0; i < num_conflicts; i++) {
-            lock_wait_callback(callback_data, m_txnid, conflicts.get(i));
-        }
-    }
 
     return deadlock;
 }
@@ -187,12 +178,19 @@ int lock_request::start(void (*lock_wait_callback)(void *, TXNID, TXNID),
         m_conflicting_txnid = conflicts.get(0);
         toku_mutex_lock(&m_info->mutex);
         insert_into_lock_requests();
-        if (deadlock_exists(conflicts, lock_wait_callback, callback_data)) {
+        if (deadlock_exists(conflicts)) {
             remove_from_lock_requests();
             r = DB_LOCK_DEADLOCK;
         }
         toku_mutex_unlock(&m_info->mutex);
         if (m_start_test_callback) m_start_test_callback(); // test callback
+
+        if (lock_wait_callback) {
+            size_t num_conflicts = conflicts.size();
+            for (size_t i = 0; i < num_conflicts; i++) {
+                lock_wait_callback(callback_data, m_txnid, conflicts.get(i));
+            }
+        }
     }
 
     if (r != DB_LOCK_NOTGRANTED) {
@@ -355,6 +353,31 @@ void lock_request::retry_all_lock_requests(locktree *lt) {
     // future threads should only retry lock requests if some still exist
     info->should_retry_lock_requests = info->pending_lock_requests.size() > 0;
 
+    toku_mutex_unlock(&info->mutex);
+}
+
+void *lock_request::get_extra(void) const {
+    return m_extra;
+}
+
+int lock_request::get_state(void) const {
+    return m_state;
+}
+
+void lock_request::kill_waiter(locktree *lt, void *extra) {
+    lt_lock_request_info *info = lt->get_lock_request_info();
+    toku_mutex_lock(&info->mutex);
+    for (size_t i = 0; i < info->pending_lock_requests.size(); i++) {
+        lock_request *request;
+        int r = info->pending_lock_requests.fetch(i, &request);
+        invariant_zero(r);
+        if (request->get_extra() == extra) {
+            fprintf(stderr, "%s %u %s %p %p %u\n", __FILE__, __LINE__, __FUNCTION__, lt, extra, request->get_state());
+            request->remove_from_lock_requests();
+            request->complete(DB_LOCK_NOTGRANTED);
+            break;
+        }
+    }
     toku_mutex_unlock(&info->mutex);
 }
 
