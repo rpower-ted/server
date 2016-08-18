@@ -195,7 +195,7 @@ int toku_db_start_range_lock(DB *db, DB_TXN *txn, const DBT *left_key, const DBT
     TXNID txn_anc_id = txn_anc->id64(txn_anc);
     request->set(db->i->lt, txn_anc_id, left_key, right_key, lock_type, toku_is_big_txn(txn_anc));
 
-    const int r = request->start();
+    const int r = request->start(txn->mgrp->i->lock_wait_needed_callback, db);
     if (r == 0) {
         db_txn_note_row_lock(db, txn_anc, left_key, right_key);
     } else if (r == DB_LOCK_DEADLOCK) {
@@ -225,6 +225,7 @@ int toku_db_wait_range_lock(DB *db, DB_TXN *txn, toku::lock_request *request) {
     if (r == 0) {
         db_txn_note_row_lock(db, txn_anc, left_key, right_key);
     } else if (r == DB_LOCK_NOTGRANTED) {
+    // ToDo: handle lock_wait_needed callback here?
         lock_timeout_callback callback = txn->mgrp->i->lock_wait_timeout_callback;
         if (callback != nullptr) {
             callback(db, txn_anc->id64(txn_anc), left_key, right_key,
@@ -249,7 +250,7 @@ void toku_db_grab_write_lock (DB *db, DBT *key, TOKUTXN tokutxn) {
     toku::lock_request request;
     request.create();
     request.set(db->i->lt, txn_anc_id, key, key, toku::lock_request::type::WRITE, toku_is_big_txn(txn_anc));
-    int r = request.start();
+    int r = request.start(NULL, NULL);
     invariant_zero(r);
     db_txn_note_row_lock(db, txn_anc, key, key);
     request.destroy();

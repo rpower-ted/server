@@ -83,7 +83,8 @@ public:
     // effect: Tries to acquire a lock described by this lock request.
     // returns: The return code of locktree::acquire_[write,read]_lock()
     //          or DB_LOCK_DEADLOCK if this request would end up deadlocked.
-    int start(void);
+    int start(void (*lock_wait_callback)(void *, TXNID, TXNID),
+              void *callback_data);
 
     // effect: Sleeps until either the request is granted or the wait time expires.
     // returns: The return code of locktree::acquire_[write,read]_lock()
@@ -180,7 +181,9 @@ private:
     void build_wait_graph(wfg *wait_graph, const txnid_set &conflicts);
 
     // returns: True if this lock request is in deadlock with the given conflicts set
-    bool deadlock_exists(const txnid_set &conflicts);
+    bool deadlock_exists(const txnid_set &conflicts,
+                         void (*lock_wait_callback)(void *, TXNID, TXNID),
+                         void *callback_data);
 
     void copy_keys(void);
 
