@@ -213,6 +213,13 @@ int lock_request::wait(uint64_t wait_time_ms, uint64_t killed_time_ms, int (*kil
 
     toku_mutex_lock(&m_info->mutex);
 
+    if (m_state == state::PENDING) {
+        retry();
+        if (m_state != state::PENDING) {
+            fprintf(stderr, "%s %u %s retry %p %" PRIu64 " worked\n", __FILE__, __LINE__, "lock_request::wait", this, m_txnid);
+        }
+    }
+
     while (m_state == state::PENDING) {
 
         // compute next wait time
@@ -287,11 +294,17 @@ int lock_request::retry(void) {
     int r;
 
     invariant(m_state == state::PENDING);
+
+    txnid_set conflicts;
+    conflicts.create();
+
     if (m_type == type::WRITE) {
-        r = m_lt->acquire_write_lock(m_txnid, m_left_key, m_right_key, nullptr, m_big_txn);
+        r = m_lt->acquire_write_lock(m_txnid, m_left_key, m_right_key, &conflicts, m_big_txn);
     } else {
-        r = m_lt->acquire_read_lock(m_txnid, m_left_key, m_right_key, nullptr, m_big_txn);
+        r = m_lt->acquire_read_lock(m_txnid, m_left_key, m_right_key, &conflicts, m_big_txn);
     }
+
+    fprintf(stderr, "%s %u %s %d\n", __FILE__, __LINE__, "lock_request::retry", r);
 
     // if the acquisition succeeded then remove ourselves from the
     // set of lock requests, complete, and signal the waiting thread.
@@ -300,8 +313,12 @@ int lock_request::retry(void) {
         complete(r);
         if (m_retry_test_callback) m_retry_test_callback(); // test callback
         toku_cond_broadcast(&m_wait_cond);
+    } else {
+        TXNID new_conflicting_txnid = conflicts.get(0);
+        fprintf(stderr, "%s %u %s %" PRIu64 " conflicting %" PRIu64 " -> %" PRIu64 "\n", __FILE__, __LINE__, "lock_request::retry", m_txnid, m_conflicting_txnid, new_conflicting_txnid);
+        m_conflicting_txnid = new_conflicting_txnid;
     }
-
+    conflicts.destroy();
     return r;
 }
 

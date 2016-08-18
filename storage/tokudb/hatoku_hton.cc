@@ -891,9 +891,9 @@ static int tokudb_commit(handlerton * hton, THD * thd, bool all) {
             tokudb_sync_on_commit(thd, trx, this_txn) ? 0 : DB_TXN_NOSYNC;
         TOKUDB_TRACE_FOR_FLAGS(
             TOKUDB_DEBUG_TXN,
-            "commit trx %u txn %p syncflag %u",
+            "commit trx %u txn %p %" PRIu64 " syncflag %u",
             all,
-            this_txn,
+            this_txn, this_txn->id64(this_txn),
             syncflag);
         // test hook to induce a crash on a debug build
         DBUG_EXECUTE_IF("tokudb_crash_commit_before", DBUG_SUICIDE(););
@@ -922,9 +922,9 @@ static int tokudb_rollback(handlerton * hton, THD * thd, bool all) {
     if (this_txn) {
         TOKUDB_TRACE_FOR_FLAGS(
             TOKUDB_DEBUG_TXN,
-            "rollback %u txn %p",
+            "rollback %u txn %p %" PRIu64,
             all,
-            this_txn);
+            this_txn, this_txn->id64(this_txn));
         tokudb_cleanup_handlers(trx, this_txn);
         abort_txn_with_progress(this_txn, thd);
         *txn = NULL;
@@ -970,9 +970,9 @@ static int tokudb_xa_prepare(handlerton* hton, THD* thd, bool all) {
         uint32_t syncflag = tokudb_sync_on_prepare() ? 0 : DB_TXN_NOSYNC;
         TOKUDB_TRACE_FOR_FLAGS(
             TOKUDB_DEBUG_XA,
-            "doing txn prepare:%d:%p",
+            "doing txn prepare:%d:%p %" PRIu64,
             all,
-            txn);
+            txn, txn->id64(txn));
         // a TOKU_XA_XID is identical to a MYSQL_XID
         TOKU_XA_XID thd_xid;
         thd_get_xid(thd, (MYSQL_XID*) &thd_xid);
