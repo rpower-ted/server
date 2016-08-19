@@ -85,7 +85,7 @@ int trx_callback(
     uint64_t tnow = (uint64_t) ::time(NULL);
     table->field[2]->store(tnow >= start_time ? tnow - start_time : 0, false);
     int error = schema_table_store_record(thd, table);
-    if (!error && thd_killed(thd))
+    if (!error && thd_kill_level(thd))
         error = ER_QUERY_INTERRUPTED;
     return error;
 }
@@ -219,7 +219,7 @@ int lock_waits_callback(
 
     int error = schema_table_store_record(thd, table);
 
-    if (!error && thd_killed(thd))
+    if (!error && thd_kill_level(thd))
         error = ER_QUERY_INTERRUPTED;
 
     return error;
@@ -361,7 +361,7 @@ int locks_callback(
 
         error = schema_table_store_record(thd, table);
 
-        if (!error && thd_killed(thd))
+        if (!error && thd_kill_level(thd))
             error = ER_QUERY_INTERRUPTED;
     }
     return error;
@@ -493,7 +493,7 @@ int report_file_map(TABLE* table, THD* thd) {
 
             error = schema_table_store_record(thd, table);
         }
-        if (!error && thd_killed(thd))
+        if (!error && thd_kill_level(thd))
             error = ER_QUERY_INTERRUPTED;
     }
     if (error == DB_NOTFOUND) {
@@ -698,7 +698,7 @@ int report_fractal_tree_info(TABLE* table, THD* thd) {
             if (error)
                 error = 0; // ignore read uncommitted errors
         }
-        if (!error && thd_killed(thd))
+        if (!error && thd_kill_level(thd))
             error = ER_QUERY_INTERRUPTED;
     }
     if (error == DB_NOTFOUND) {
@@ -989,7 +989,7 @@ int report_fractal_tree_block_map(TABLE* table, THD* thd) {
                 table,
                 thd);
         }
-        if (!error && thd_killed(thd))
+        if (!error && thd_kill_level(thd))
             error = ER_QUERY_INTERRUPTED;
     }
     if (error == DB_NOTFOUND) {
