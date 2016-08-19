@@ -4571,6 +4571,7 @@ thd_report_wait_for(MYSQL_THD thd, MYSQL_THD other_thd)
   thd->transaction.stmt.mark_trans_did_wait();
   if (!other_thd)
     return;
+fprintf(stderr, "TODO3: thd_report_wait_for(%p, %p)\n", thd, other_thd);
   binlog_report_wait_for(thd, other_thd);
   rgi= thd->rgi_slave;
   other_rgi= other_thd->rgi_slave;
@@ -4582,6 +4583,7 @@ thd_report_wait_for(MYSQL_THD thd, MYSQL_THD other_thd)
     return;
   if (!rgi->gtid_sub_id || !other_rgi->gtid_sub_id)
     return;
+fprintf(stderr, "TODO3:   GTIDs %u-%u-%lu and %u-%u-%lu\n", rgi->current_gtid.domain_id, rgi->current_gtid.server_id, (ulong)rgi->current_gtid.seq_no, other_rgi->current_gtid.domain_id, other_rgi->current_gtid.server_id, (ulong)other_rgi->current_gtid.seq_no);
   if (rgi->current_gtid.domain_id != other_rgi->current_gtid.domain_id)
     return;
   if (rgi->gtid_sub_id > other_rgi->gtid_sub_id)
@@ -4594,6 +4596,7 @@ thd_report_wait_for(MYSQL_THD thd, MYSQL_THD other_thd)
     cause replication to rollback (and later re-try) the other transaction,
     releasing the lock for this transaction so replication can proceed.
   */
+fprintf(stderr, "TODO3:  THD %p deadlock kills %p\n", thd, other_thd);
   other_rgi->killed_for_retry= true;
   mysql_mutex_lock(&other_thd->LOCK_thd_data);
   other_thd->awake(KILL_CONNECTION);

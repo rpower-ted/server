@@ -66,6 +66,7 @@ void lock_request::create(void) {
 
     m_start_test_callback = nullptr;
     m_retry_test_callback = nullptr;
+    m_wait_needed_callback = nullptr;
 }
 
 // destroy a lock request.
@@ -161,6 +162,7 @@ int lock_request::start(void (*lock_wait_callback)(void *, TXNID, TXNID),
     int r;
 
     txnid_set conflicts;
+    m_wait_needed_callback = lock_wait_callback;
     conflicts.create();
     if (m_type == type::WRITE) {
         r = m_lt->acquire_write_lock(m_txnid, m_left_key, m_right_key, &conflicts, m_big_txn);
@@ -185,7 +187,7 @@ int lock_request::start(void (*lock_wait_callback)(void *, TXNID, TXNID),
         toku_mutex_unlock(&m_info->mutex);
         if (m_start_test_callback) m_start_test_callback(); // test callback
 
-        if (lock_wait_callback) {
+        if (0&& lock_wait_callback) {
             size_t num_conflicts = conflicts.size();
             for (size_t i = 0; i < num_conflicts; i++) {
                 lock_wait_callback(callback_data, m_txnid, conflicts.get(i));
@@ -317,6 +319,13 @@ int lock_request::retry(void) {
         TXNID new_conflicting_txnid = conflicts.get(0);
         fprintf(stderr, "%s %u %s %" PRIu64 " conflicting %" PRIu64 " -> %" PRIu64 "\n", __FILE__, __LINE__, "lock_request::retry", m_txnid, m_conflicting_txnid, new_conflicting_txnid);
         m_conflicting_txnid = new_conflicting_txnid;
+
+        if (m_wait_needed_callback) {
+            size_t num_conflicts = conflicts.size();
+            for (size_t i = 0; i < num_conflicts; i++) {
+                (*m_wait_needed_callback)(nullptr, m_txnid, conflicts.get(i));
+            }
+        }
     }
     conflicts.destroy();
     return r;
@@ -336,9 +345,11 @@ void lock_request::retry_all_lock_requests(locktree *lt) {
     // therefore, the lock request code must ensures that when lock requests
     // are added to this locktree, the bit is set.
     // see lock_request::insert_into_lock_requests()
-    if (!info->should_retry_lock_requests) {
+    if (0&& !info->should_retry_lock_requests) {
+fprintf(stderr, "TODO6: retry_all_lock_requests() SKIP\n");
         return;
     }
+fprintf(stderr, "TODO6: retry_all_lock_requests() doit\n");
 
     toku_mutex_lock(&info->mutex);
 
@@ -383,7 +394,7 @@ int lock_request::get_state(void) const {
 
 void lock_request::kill_waiter(locktree *lt, void *extra) {
     lt_lock_request_info *info = lt->get_lock_request_info();
-    toku_mutex_lock(&info->mutex);
+    //toku_mutex_lock(&info->mutex);
     for (size_t i = 0; i < info->pending_lock_requests.size(); i++) {
         lock_request *request;
         int r = info->pending_lock_requests.fetch(i, &request);
@@ -395,7 +406,7 @@ void lock_request::kill_waiter(locktree *lt, void *extra) {
             break;
         }
     }
-    toku_mutex_unlock(&info->mutex);
+    //toku_mutex_unlock(&info->mutex);
 }
 
 // find another lock request by txnid. must hold the mutex.

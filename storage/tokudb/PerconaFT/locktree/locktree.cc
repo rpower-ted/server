@@ -456,6 +456,7 @@ void locktree::remove_overlapping_locks_for_txnid(TXNID txnid,
                                                   const DBT *left_key,
                                                   const DBT *right_key) {
     keyrange release_range;
+fprintf(stderr, "TODO5: remove_overlapping_locks_for_txnid(TXNID %lu)\n", (unsigned long)txnid);
     release_range.create(left_key, right_key);
 
     // acquire and prepare a locked keyrange over the release range
@@ -474,8 +475,10 @@ void locktree::remove_overlapping_locks_for_txnid(TXNID txnid,
         // If this isn't our lock, that's ok, just don't remove it.
         // See rationale above.
         if (lock.txnid == txnid) {
+fprintf(stderr, "TODO5   remove lock\n");
             remove_row_lock_from_tree(&lkr, lock, m_mgr);
         }
+else fprintf(stderr, "TODO5   skip remove of owned by %lu\n", (unsigned long)txnid);
     }
 
     lkr.release();
@@ -518,6 +521,7 @@ void locktree::release_locks(TXNID txnid, const range_buffer *ranges) {
     // locks are already released, otherwise we need to do it here.
     bool released = sto_try_release(txnid);
     if (!released) {
+fprintf(stderr, "TODO4: release_locks(TXNID %lu) releasing...\n", (unsigned long)txnid);
         range_buffer::iterator iter(ranges);
         range_buffer::iterator::record rec;
         while (iter.current(&rec)) {
@@ -537,6 +541,7 @@ void locktree::release_locks(TXNID txnid, const range_buffer *ranges) {
             toku_sync_fetch_and_add(&m_sto_score, 1);
         }
     }
+else fprintf(stderr, "TODO4: release_locks(TXNID %lu) single transaction optimisation\n", (unsigned long)txnid);
 }
 
 // iterate over a locked keyrange and extract copies of the first N

@@ -198,6 +198,7 @@ private:
 
     void (*m_start_test_callback)(void);
     void (*m_retry_test_callback)(void);
+    void (*m_wait_needed_callback)(void *, TXNID, TXNID);
 
     friend class lock_request_unit_test;
 };
