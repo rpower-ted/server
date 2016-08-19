@@ -119,7 +119,7 @@ public:
 
     int get_state(void) const;
 
-    static void kill_waiter(locktree *lt, void *extra);
+    static void kill_waiter(locktree *lt, void *extra, bool have_mutex);
 
 private:
 

@@ -421,7 +421,7 @@ static void print_db_env_struct (void) {
                              "int (*set_client_pool_threads)(DB_ENV *, uint32_t)",
                              "int (*set_cachetable_pool_threads)(DB_ENV *, uint32_t)",
                              "int (*set_checkpoint_pool_threads)(DB_ENV *, uint32_t)",
-                             "void (*kill_waiter)(DB_ENV *env, void *client_extra)",
+                             "void (*kill_waiter)(DB_ENV *env, void *client_extra, bool have_mutex)",
                              NULL};
 
         sort_and_dump_fields("db_env", true, extra);

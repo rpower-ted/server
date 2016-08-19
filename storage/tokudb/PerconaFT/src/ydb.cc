@@ -2557,9 +2557,9 @@ static void env_do_backtrace(DB_ENV *env) {
     }
 }
 
-static void env_kill_waiter(DB_ENV *env, void *client_extra) {
+static void env_kill_waiter(DB_ENV *env, void *client_extra, bool have_mutex) {
     fprintf(stderr, "%s %u %s %p\n", __FILE__, __LINE__, __FUNCTION__, client_extra);
-    env->i->ltm.kill_waiter(client_extra);
+    env->i->ltm.kill_waiter(client_extra, have_mutex);
 }
 
 static int 

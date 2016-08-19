@@ -73,7 +73,7 @@ static void test_kill_waiter(void) {
     }
 
     for (int i = 0; i < n_locks-1; i++) {
-        mgr.kill_waiter(&waiters[i]);
+        mgr.kill_waiter(&waiters[i], false);
         while (!done[i]) sleep(1);
         waiters[i].join();
         for (int j = i+1; j < n_locks-1; j++)

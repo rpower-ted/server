@@ -392,9 +392,10 @@ int lock_request::get_state(void) const {
     return m_state;
 }
 
-void lock_request::kill_waiter(locktree *lt, void *extra) {
+void lock_request::kill_waiter(locktree *lt, void *extra, bool have_mutex) {
     lt_lock_request_info *info = lt->get_lock_request_info();
-    //toku_mutex_lock(&info->mutex);
+    if (!have_mutex)
+        toku_mutex_lock(&info->mutex);
     for (size_t i = 0; i < info->pending_lock_requests.size(); i++) {
         lock_request *request;
         int r = info->pending_lock_requests.fetch(i, &request);
@@ -406,7 +407,8 @@ void lock_request::kill_waiter(locktree *lt, void *extra) {
             break;
         }
     }
-    //toku_mutex_unlock(&info->mutex);
+    if (!have_mutex)
+        toku_mutex_unlock(&info->mutex);
 }
 
 // find another lock request by txnid. must hold the mutex.
