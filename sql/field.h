@@ -3786,6 +3786,7 @@ public:
   }
 
   Column_definition(THD *thd, Field *field, Field *orig_field);
+  void set_attributes(const Lex_field_type_st &type, CHARSET_INFO *cs);
   void create_length_to_internal_length(void);
 
   bool check(THD *thd);
