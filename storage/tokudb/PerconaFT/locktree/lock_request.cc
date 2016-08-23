@@ -392,6 +392,12 @@ int lock_request::get_state(void) const {
     return m_state;
 }
 
+void lock_request::kill_waiter(void) {
+    remove_from_lock_requests();
+    complete(DB_LOCK_NOTGRANTED);
+    toku_cond_broadcast(&m_wait_cond);
+}
+
 void lock_request::kill_waiter(locktree *lt, void *extra, bool have_mutex) {
     lt_lock_request_info *info = lt->get_lock_request_info();
     if (!have_mutex)
@@ -402,8 +408,7 @@ void lock_request::kill_waiter(locktree *lt, void *extra, bool have_mutex) {
         invariant_zero(r);
         if (request->get_extra() == extra) {
             fprintf(stderr, "%s %u %s %p %p %u\n", __FILE__, __LINE__, __FUNCTION__, lt, extra, request->get_state());
-            request->remove_from_lock_requests();
-            request->complete(DB_LOCK_NOTGRANTED);
+            request->kill_waiter();
             break;
         }
     }
