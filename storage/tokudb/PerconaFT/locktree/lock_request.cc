@@ -156,7 +156,7 @@ bool lock_request::deadlock_exists(const txnid_set &conflicts) {
 }
 
 // try to acquire a lock described by this lock request. 
-int lock_request::start(void) {
+int lock_request::start(void (*lock_wait_callback)(void *, TXNID, TXNID)) {
     int r;
 
     txnid_set conflicts;
@@ -180,8 +180,16 @@ int lock_request::start(void) {
         if (deadlock_exists(conflicts)) {
             remove_from_lock_requests();
             r = DB_LOCK_DEADLOCK;
+            toku_mutex_unlock(&m_info->mutex);
+
+            GrowableArray<TXNID> conflicts_collector;
+            conflicts_collector.init();
+            add_conflicts_to_waits(&conflicts, &conflicts_collector);
+            report_waits(&conflicts_collector, lock_wait_callback);
+            conflicts_collector.deinit();
+        } else {
+            toku_mutex_unlock(&m_info->mutex);
         }
-        toku_mutex_unlock(&m_info->mutex);
         if (m_start_test_callback) m_start_test_callback(); // test callback
     }
 
@@ -191,6 +199,27 @@ int lock_request::start(void) {
 
     conflicts.destroy();
     return r;
+}
+
+void lock_request::add_conflicts_to_waits(txnid_set *conflicts,
+                                          GrowableArray<TXNID> *wait_conflicts) {
+    size_t num_conflicts = conflicts->size();
+    for (size_t i = 0; i < num_conflicts; i++) {
+        wait_conflicts->push(m_txnid);
+        wait_conflicts->push(conflicts->get(i));
+    }
+}
+
+void lock_request::report_waits(GrowableArray<TXNID> *wait_conflicts,
+                                void (*lock_wait_callback)(void *, TXNID, TXNID)) {
+    if (!lock_wait_callback)
+        return;
+    size_t num_conflicts = wait_conflicts->get_size();
+    for (size_t i = 0; i < num_conflicts; i += 2) {
+        TXNID blocked_txnid = wait_conflicts->fetch_unchecked(i);
+        TXNID blocking_txnid = wait_conflicts->fetch_unchecked(i+1);
+        (*lock_wait_callback)(nullptr, blocked_txnid, blocking_txnid);
+    }
 }
 
 // sleep on the lock request until it becomes resolved or the wait time has elapsed.
@@ -216,12 +245,7 @@ int lock_request::wait(uint64_t wait_time_ms, uint64_t killed_time_ms,
             fprintf(stderr, "%s %u %s retry %p %" PRIu64 " worked\n", __FILE__, __LINE__, "lock_request::wait", this, m_txnid);
         }
 
-        size_t num_conflicts = conflicts_collector.get_size();
-        for (size_t i = 0; i < num_conflicts; i += 2) {
-            TXNID blocked_txnid = conflicts_collector.fetch_unchecked(i);
-            TXNID blocking_txnid = conflicts_collector.fetch_unchecked(i+1);
-            (*lock_wait_callback)(nullptr, blocked_txnid, blocking_txnid);
-        }
+        report_waits(&conflicts_collector, lock_wait_callback);
         conflicts_collector.deinit();
     }
 
@@ -295,7 +319,7 @@ TXNID lock_request::get_conflicting_txnid(void) const {
     return m_conflicting_txnid;
 }
 
-int lock_request::retry(GrowableArray<TXNID> *conflict_collector) {
+int lock_request::retry(GrowableArray<TXNID> *conflicts_collector) {
     int r;
 
     invariant(m_state == state::PENDING);
@@ -322,12 +346,7 @@ int lock_request::retry(GrowableArray<TXNID> *conflict_collector) {
         TXNID new_conflicting_txnid = conflicts.get(0);
         fprintf(stderr, "%s %u %s %" PRIu64 " conflicting %" PRIu64 " -> %" PRIu64 "\n", __FILE__, __LINE__, "lock_request::retry", m_txnid, m_conflicting_txnid, new_conflicting_txnid);
         m_conflicting_txnid = new_conflicting_txnid;
-
-        size_t num_conflicts = conflicts.size();
-        for (size_t i = 0; i < num_conflicts; i++) {
-            conflict_collector->push(m_txnid);
-            conflict_collector->push(conflicts.get(i));
-        }
+        add_conflicts_to_waits(&conflicts, conflicts_collector);
     }
     conflicts.destroy();
     return r;
@@ -386,12 +405,8 @@ void lock_request::retry_all_lock_requests(locktree *lt,
 
     toku_mutex_unlock(&info->mutex);
 
-    size_t num_conflicts = conflicts_collector.get_size();
-    for (i = 0; i < num_conflicts; i += 2) {
-        TXNID blocked_txnid = conflicts_collector.fetch_unchecked(i);
-        TXNID blocking_txnid = conflicts_collector.fetch_unchecked(i+1);
-        (lock_wait_callback)(nullptr, blocked_txnid, blocking_txnid);
-    }
+    report_waits(&conflicts_collector, lock_wait_callback);
+    conflicts_collector.deinit();
 }
 
 void *lock_request::get_extra(void) const {
