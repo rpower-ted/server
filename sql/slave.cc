@@ -350,6 +350,8 @@ handle_slave_background(void *arg __attribute__((unused)))
       kill_list= p->next;
 
       mysql_mutex_lock(&p->to_kill->LOCK_thd_data);
+      p->to_kill->rgi_slave->killed_for_retry=
+        rpl_group_info::RETRY_KILL_KILLED;
       p->to_kill->awake(KILL_CONNECTION);
       mysql_mutex_unlock(&p->to_kill->LOCK_thd_data);
       my_free(p);
@@ -374,12 +376,15 @@ handle_slave_background(void *arg __attribute__((unused)))
 void
 slave_background_kill_request(THD *to_kill)
 {
+  if (to_kill->rgi_slave->killed_for_retry)
+    return;                                     // Already deadlock killed.
   slave_background_kill_t *p=
     (slave_background_kill_t *)my_malloc(sizeof(*p), MYF(MY_WME));
   if (p)
   {
     p->to_kill= to_kill;
-    to_kill->rgi_slave->killed_for_retry= true;
+    to_kill->rgi_slave->killed_for_retry=
+      rpl_group_info::RETRY_KILL_PENDING;
     mysql_mutex_lock(&LOCK_slave_background);
     p->next= slave_background_kill_list;
     slave_background_kill_list= p;

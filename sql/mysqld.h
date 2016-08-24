@@ -495,6 +495,7 @@ extern PSI_stage_info stage_master_gtid_wait;
 extern PSI_stage_info stage_gtid_wait_other_connection;
 extern PSI_stage_info stage_slave_background_process_request;
 extern PSI_stage_info stage_slave_background_wait_request;
+extern PSI_stage_info stage_waiting_for_deadlock_kill;
 
 #ifdef HAVE_PSI_STATEMENT_INTERFACE
 /**

@@ -10141,6 +10141,7 @@ PSI_stage_info stage_master_gtid_wait= { 0, "Waiting in MASTER_GTID_WAIT()", 0};
 PSI_stage_info stage_gtid_wait_other_connection= { 0, "Waiting for other master connection to process GTID received on multiple master connections", 0};
 PSI_stage_info stage_slave_background_process_request= { 0, "Processing requests", 0};
 PSI_stage_info stage_slave_background_wait_request= { 0, "Waiting for requests", 0};
+PSI_stage_info stage_waiting_for_deadlock_kill= { 0, "Waiting for parallel replication deadlock handling to complete", 0};
 
 #ifdef HAVE_PSI_INTERFACE
 
