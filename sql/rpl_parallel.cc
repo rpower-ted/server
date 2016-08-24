@@ -654,7 +654,6 @@ retry_event_group(rpl_group_info *rgi, rpl_parallel_thread *rpt,
   Format_description_log_event *description_event= NULL;
 
 do_retry:
-fprintf(stderr, "TODO2: retry_event_group(GTID %u-%u-%lu thd %p) retry %lu\n", rgi->current_gtid.domain_id, rgi->current_gtid.server_id, (ulong)rgi->current_gtid.seq_no, thd, retries);
 
   event_count= 0;
   err= 0;
@@ -1173,7 +1172,6 @@ handle_rpl_parallel_thread(void *arg)
           signal_error_to_sql_driver_thread(thd, rgi, 1);
         }
 
-fprintf(stderr, "TODO1 THD %p new GTID %u-%u-%lu\n", thd, rgi->current_gtid.domain_id, rgi->current_gtid.server_id, (ulong)rgi->current_gtid.seq_no);
       }
 
       group_rgi= rgi;

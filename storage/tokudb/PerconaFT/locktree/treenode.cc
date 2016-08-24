@@ -173,11 +173,9 @@ treenode *treenode::find_node_with_overlapping_child(const keyrange &range,
 template <class F>
 void treenode::traverse_overlaps(const keyrange &range, F *function) {
     keyrange::comparison c = range.compare(*m_cmp, m_range);
-fprintf(stderr, "TODO12 %p %lu match=%d\n", this, (unsigned long)m_txnid, (int)c);
     if (c == keyrange::comparison::EQUALS) {
         // Doesn't matter if fn wants to keep going, there
         // is nothing left, so return.
-fprintf(stderr, "TODO12 %p %lu EQUALS/done\n", this, (unsigned long)m_txnid);
         function->fn(m_range, m_txnid);
         return;
     }
@@ -193,7 +191,6 @@ fprintf(stderr, "TODO12 %p %lu EQUALS/done\n", this, (unsigned long)m_txnid);
     }
 
     if (c == keyrange::comparison::OVERLAPS) {
-fprintf(stderr, "TODO12 %p %lu overlaps\n", this, (unsigned long)m_txnid);
         bool keep_going = function->fn(m_range, m_txnid);
         if (!keep_going) {
             return;
@@ -333,14 +330,11 @@ treenode *treenode::remove(const keyrange &range) {
     // the root of this subtree. otherwise search down the tree
     // in either the left or right children.
     keyrange::comparison c = range.compare(*m_cmp, m_range);
-fprintf(stderr, "TODO11 %p %lu match=%d\n", this, (unsigned long)m_txnid, (int)c);
     switch (c) {
     case keyrange::comparison::EQUALS:
-fprintf(stderr, "TODO11 %p MATCH\n", this);
         return remove_root_of_subtree();
     case keyrange::comparison::LESS_THAN:
         child = m_left_child.get_locked();
-fprintf(stderr, "TODO11 %p left -> %p\n", this, child);
         invariant_notnull(child);
         child = child->remove(range);
 
@@ -353,7 +347,6 @@ fprintf(stderr, "TODO11 %p left -> %p\n", this, child);
         break;
     case keyrange::comparison::GREATER_THAN:
         child = m_right_child.get_locked();
-fprintf(stderr, "TODO11 %p right -> %p\n", this, child);
         invariant_notnull(child);
         child = child->remove(range);
 
@@ -367,10 +360,7 @@ fprintf(stderr, "TODO11 %p right -> %p\n", this, child);
     case keyrange::comparison::OVERLAPS:
         // shouldn't be overlapping, since the tree is
         // non-overlapping and this range must exist
-fprintf(stderr, "TODO11 treenode::remove() ABORT?!?\n");
         abort();
-    default:
-fprintf(stderr, "TODO11 treenode::remove() PUNT! c=%d\n", (int)c);
     }
 
     return this;

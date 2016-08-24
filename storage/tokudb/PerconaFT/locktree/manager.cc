@@ -483,7 +483,7 @@ void locktree_manager::get_status(LTM_STATUS statp) {
     *statp = ltm_status;
 }
 
-void locktree_manager::kill_waiter(void *extra, bool have_mutex) {
+void locktree_manager::kill_waiter(void *extra) {
     mutex_lock();
     int r = 0;
     size_t num_locktrees = m_locktree_map.size();
@@ -491,7 +491,7 @@ void locktree_manager::kill_waiter(void *extra, bool have_mutex) {
         locktree *lt;
         r = m_locktree_map.fetch(i, &lt);
         invariant_zero(r);
-        lock_request::kill_waiter(lt, extra, have_mutex);
+        lock_request::kill_waiter(lt, extra);
     }
     mutex_unlock();
 }

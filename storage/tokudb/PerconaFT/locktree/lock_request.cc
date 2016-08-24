@@ -350,10 +350,8 @@ void lock_request::retry_all_lock_requests(locktree *lt,
     // are added to this locktree, the bit is set.
     // see lock_request::insert_into_lock_requests()
     if (0&& !info->should_retry_lock_requests) {
-fprintf(stderr, "TODO6: retry_all_lock_requests() SKIP\n");
         return;
     }
-fprintf(stderr, "TODO6: retry_all_lock_requests() doit\n");
 
     toku_mutex_lock(&info->mutex);
 
@@ -386,15 +384,14 @@ fprintf(stderr, "TODO6: retry_all_lock_requests() doit\n");
     // future threads should only retry lock requests if some still exist
     info->should_retry_lock_requests = info->pending_lock_requests.size() > 0;
 
-    // ToDo: Could do this outside the lock, passing a flag down to callback.
+    toku_mutex_unlock(&info->mutex);
+
     size_t num_conflicts = conflicts_collector.get_size();
     for (i = 0; i < num_conflicts; i += 2) {
         TXNID blocked_txnid = conflicts_collector.fetch_unchecked(i);
         TXNID blocking_txnid = conflicts_collector.fetch_unchecked(i+1);
         (lock_wait_callback)(nullptr, blocked_txnid, blocking_txnid);
     }
-
-    toku_mutex_unlock(&info->mutex);
 }
 
 void *lock_request::get_extra(void) const {
@@ -411,10 +408,9 @@ void lock_request::kill_waiter(void) {
     toku_cond_broadcast(&m_wait_cond);
 }
 
-void lock_request::kill_waiter(locktree *lt, void *extra, bool have_mutex) {
+void lock_request::kill_waiter(locktree *lt, void *extra) {
     lt_lock_request_info *info = lt->get_lock_request_info();
-    if (!have_mutex)
-        toku_mutex_lock(&info->mutex);
+    toku_mutex_lock(&info->mutex);
     for (size_t i = 0; i < info->pending_lock_requests.size(); i++) {
         lock_request *request;
         int r = info->pending_lock_requests.fetch(i, &request);
@@ -425,8 +421,7 @@ void lock_request::kill_waiter(locktree *lt, void *extra, bool have_mutex) {
             break;
         }
     }
-    if (!have_mutex)
-        toku_mutex_unlock(&info->mutex);
+    toku_mutex_unlock(&info->mutex);
 }
 
 // find another lock request by txnid. must hold the mutex.

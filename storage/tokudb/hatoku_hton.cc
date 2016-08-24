@@ -761,18 +761,6 @@ static int tokudb_close_connection(handlerton* hton, THD* thd) {
     return error;
 }
 
-/*
-  Flag to avoid double locking of locktree mutex. When thd_report_wait_for is
-  called from lock_request (through callback), we already have the locktree
-  mutex, so we must not take it recursively if thd_report_wait_for calls back
-  into tokudb_kill_query(). So around thd_report_wait_for(), we set this
-  variable to current_thd; then we pass a flag to skip locking if it matches
-  current_thd inside tokudb_kill_query(). We can do the check without extra
-  locking; even if the flag changes under our feet, it can only change between
-  NULL and current lock owner, never become equal to unrelated THD.
-*/
-static THD *current_lock_mutex_owner = NULL;
-
 void tokudb_kill_query(handlerton *hton, THD *thd, enum thd_kill_levels level) {
     TOKUDB_DBUG_ENTER("");
     tokudb_trx_data *trx = (tokudb_trx_data *) thd_get_ha_data(thd, hton);
@@ -780,7 +768,7 @@ void tokudb_kill_query(handlerton *hton, THD *thd, enum thd_kill_levels level) {
         sql_print_information("%s thd %p %u level %u current %p trx %p %p", __FUNCTION__, thd, thd_get_thread_id(thd), level, current_thd, trx->all, trx->stmt);
     else
         sql_print_information("%s thd %p %u level %u current %p", __FUNCTION__, thd, thd_get_thread_id(thd), level, current_thd);
-    db_env->kill_waiter(db_env, thd, (current_lock_mutex_owner == current_thd));
+    db_env->kill_waiter(db_env, thd);
     DBUG_VOID_RETURN;
 }
 
@@ -1778,7 +1766,7 @@ static void tokudb_lock_timeout_callback(
     }
 }
 
-extern "C" void thd_report_wait_for(MYSQL_THD thd, MYSQL_THD other_thd);
+extern "C" void thd_rpl_deadlock_check(MYSQL_THD thd, MYSQL_THD other_thd);
 
 struct tokudb_search_txn_thd {
     bool match_found;
@@ -1831,9 +1819,7 @@ static void tokudb_lock_wait_needed_callback(
     if (tokudb_txn_id_to_thd(requesting_txnid, &requesting_thd) &&
         tokudb_txn_id_to_thd(blocking_txnid, &blocking_thd)) {
         sql_print_information("%s report wait for %p %" PRIu64 " %p %" PRIu64, __FUNCTION__, requesting_thd, requesting_txnid, blocking_thd, blocking_txnid);
-        current_lock_mutex_owner = current_thd;
-        thd_report_wait_for (requesting_thd, blocking_thd);
-        current_lock_mutex_owner = NULL;
+        thd_rpl_deadlock_check (requesting_thd, blocking_thd);
     } else
         sql_print_information("%s no report %" PRIu64 " %" PRIu64, __FUNCTION__, requesting_txnid, blocking_txnid);
 }

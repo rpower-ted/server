@@ -121,7 +121,7 @@ public:
 
     void kill_waiter(void);
 
-    static void kill_waiter(locktree *lt, void *extra, bool have_mutex);
+    static void kill_waiter(locktree *lt, void *extra);
 
 private:
 
