@@ -83,14 +83,14 @@ public:
     // effect: Tries to acquire a lock described by this lock request.
     // returns: The return code of locktree::acquire_[write,read]_lock()
     //          or DB_LOCK_DEADLOCK if this request would end up deadlocked.
-    int start(void (*lock_wait_callback)(void *, TXNID, TXNID),
-              void *callback_data);
+    int start(void);
 
     // effect: Sleeps until either the request is granted or the wait time expires.
     // returns: The return code of locktree::acquire_[write,read]_lock()
     //          or simply DB_LOCK_NOTGRANTED if the wait time expired.
-    int wait(uint64_t wait_time_ms);
-    int wait(uint64_t wait_time_ms, uint64_t killed_time_ms, int (*killed_callback)(void));
+    int wait(uint64_t wait_time_ms, void (*lock_wait_callback)(void *, TXNID, TXNID));
+    int wait(uint64_t wait_time_ms, uint64_t killed_time_ms, int (*killed_callback)(void),
+             void (*lock_wait_callback)(void *, TXNID, TXNID));
 
     // return: left end-point of the lock range
     const DBT *get_left_key(void) const;
@@ -110,7 +110,7 @@ public:
     // effect: Retries all of the lock requests for the given locktree.
     //         Any lock requests successfully restarted is completed and woken up.
     //         The rest remain pending.
-    static void retry_all_lock_requests(locktree *lt);
+    static void retry_all_lock_requests(locktree *lt, void (*lock_wait_callback)(void *, TXNID, TXNID));
 
     void set_start_test_callback(void (*f)(void));
     void set_retry_test_callback(void (*f)(void));
@@ -166,7 +166,7 @@ private:
 
     // effect: tries again to acquire the lock described by this lock request
     // returns: 0 if retrying the request succeeded and is now complete
-    int retry(void);
+    int retry(GrowableArray<TXNID> *conflict_collector);
 
     void complete(int complete_r);
 
@@ -200,7 +200,6 @@ private:
 
     void (*m_start_test_callback)(void);
     void (*m_retry_test_callback)(void);
-    void (*m_wait_needed_callback)(void *, TXNID, TXNID);
 
     friend class lock_request_unit_test;
 };

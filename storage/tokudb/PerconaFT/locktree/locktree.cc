@@ -134,6 +134,7 @@ static void iterate_and_get_overlapping_row_locks(const concurrent_tree::locked_
     struct copy_fn_obj {
         GrowableArray<row_lock> *row_locks;
         bool fn(const keyrange &range, TXNID txnid) {
+fprintf(stderr, "TODO10: get_operlapping() got txnid=%lu\n", (unsigned long)txnid);
             row_lock lock = { .range = range, .txnid = txnid };
             row_locks->push(lock);
             return true;
@@ -313,6 +314,7 @@ int locktree::acquire_lock_consolidated(void *prepared_lkr,
     int r = 0;
     concurrent_tree::locked_keyrange *lkr;
 
+fprintf(stderr, "TODO9: acquire_lock_consolidated(txnid=%lu)\n", (unsigned long)txnid);
     keyrange requested_range;
     requested_range.create(left_key, right_key);
     lkr = static_cast<concurrent_tree::locked_keyrange *>(prepared_lkr); 
@@ -328,6 +330,7 @@ int locktree::acquire_lock_consolidated(void *prepared_lkr,
     bool conflicts_exist = determine_conflicting_txnids(overlapping_row_locks,
                                                         txnid, conflicts);
     if (!conflicts_exist) {
+fprintf(stderr, "TODO9:   acquire_lock_consolidated(txnid=%lu) consolidate num=%lu\n", (unsigned long)txnid, (unsigned long)num_overlapping_row_locks);
         // there are no conflicts, so all of the overlaps are for the requesting txnid.
         // so, we must consolidate all existing overlapping ranges and the requested
         // range into one dominating range. then we insert the dominating range.
@@ -341,6 +344,7 @@ int locktree::acquire_lock_consolidated(void *prepared_lkr,
         row_lock new_lock = { .range = requested_range, .txnid = txnid };
         insert_row_lock_into_tree(lkr, new_lock, m_mgr);
     } else {
+fprintf(stderr, "TODO9:   acquire_lock_consolidated(txnid=%lu) NOTGRANTED\n", (unsigned long)txnid);
         r = DB_LOCK_NOTGRANTED;
     }
 
@@ -371,6 +375,7 @@ int locktree::acquire_lock(bool is_write_request,
     if (!acquired) {
         r = acquire_lock_consolidated(&lkr, txnid, left_key, right_key, conflicts);
     }
+else fprintf(stderr, "TODO8: acquire_lock(tnxid=%lu) single transaction optimisation", (unsigned long)txnid);
 
     lkr.release();
     return r;
@@ -456,7 +461,7 @@ void locktree::remove_overlapping_locks_for_txnid(TXNID txnid,
                                                   const DBT *left_key,
                                                   const DBT *right_key) {
     keyrange release_range;
-fprintf(stderr, "TODO5: remove_overlapping_locks_for_txnid(TXNID %lu)\n", (unsigned long)txnid);
+fprintf(stderr, "TODO5: remove_overlapping_locks_for_txnid(locktree=%p TXNID %lu)\n", this, (unsigned long)txnid);
     release_range.create(left_key, right_key);
 
     // acquire and prepare a locked keyrange over the release range
